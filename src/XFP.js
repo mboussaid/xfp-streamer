@@ -139,8 +139,8 @@ class XFP {
                     '--disable-dev-shm-usage',
                     '--disable-accelerated-2d-canvas',
                     `--window-size=1280,720`,
-                    `--audio-output-channels=2`,
-                    `--alsa-output-device=${this.audioSinkName}`
+                    // `--audio-output-channels=2`,
+                    // `--alsa-output-device=${this.audioSinkName}`
                 ],
                 ignoreDefaultArgs: ['--enable-automation']
             });
