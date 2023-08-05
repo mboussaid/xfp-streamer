@@ -3,10 +3,14 @@ const { spawn, exec } = require('child_process')
 const puppeteer = require('puppeteer');
 const usePromise = require('./usePomise');
 const useCommandExistsPromise = require('./useCommandExists');
-const REQUIRED_COMMANDS = ['ffmpeg', 'pulseaudio', 'pacmd', 'pactl','Xvfb'];
+const path = require('path');
+const REQUIRED_COMMANDS = ['ffmpeg', 'pulseaudio', 'pacmd', 'pactl', 'Xvfb'];
 class XFP {
     constructor(options = {}) {
-        this.xvfb = new xvfb();
+        const args = '-screen 0 1280x720x24';
+        this.xvfb = new xvfb({
+            xvfb_args: args.split(' ').map(a => a.trim())
+        });
         this.display = null
         if (typeof options !== "object") return
         this.debug = +options.debug === 1;
@@ -36,25 +40,25 @@ class XFP {
     }
     async onStart() {
         const promise = usePromise();
-        if (this.started){
+        if (this.started) {
             this.error('already started');
             promise.resolve();
             return promise;
         }
         let success = true;
-        try{
+        try {
             await this.onStartXVFB();
-        }catch(err){
+        } catch (err) {
             success = false;
         }
-        try{
+        try {
             await this.onStartBrowser();
-        }catch(err){
+        } catch (err) {
             success = false;
         }
-        try{
+        try {
             await this.onStartFFMPEG();
-        }catch(err){
+        } catch (err) {
             success = false;
         }
         this.started = success;
@@ -63,7 +67,7 @@ class XFP {
     }
     async onStop() {
         const promise = usePromise();
-        if (!this.started){
+        if (!this.started) {
             this.error('already stopped')
             promise.resolve();
             return promise;
@@ -107,23 +111,25 @@ class XFP {
         try {
             this.info('Starting puppeteer')
             this.browser = await puppeteer.launch({
-                headless: "new",
+                headless: false,
                 args: [
-                    `--kiosk`,
-                    `--no-first-run`,
-                    `-start-fullscreen`,
-                    `--autoplay-policy=no-user-gesture-required`,
-                    `--hide-scrollbars`,
-                    `--window-position=0,0`,
-                    `--no-sandbox`,
-                    `--disable-setuid-sandbox`,
-                    `--disable-gpu`,
-                    `--disable-software-rasterizer`,
-                    `--disable-dev-shm-usage`,
-                    `--disable-accelerated-2d-canvas`,
-                    // `--audio-output-channels=2`, // Enable audio channels (stereo)
-                    // `--alsa-output-device=plug:virtual_sink`, // Replace 'virtual_sink' with your PulseAudio virtual sink name
+                    `--display=${this.display}.0`,
+                    '--disable-infobars',
+                    '--kiosk',
+                    '--no-first-run',
+                    '--start-fullscreen',
+                    '--autoplay-policy=no-user-gesture-required',
+                    '--hide-scrollbars',
+                    '--window-position=0,0',
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-gpu',
+                    '--disable-software-rasterizer',
+                    '--disable-dev-shm-usage',
+                    '--disable-accelerated-2d-canvas',
+                    `--window-size=1280,720`
                 ],
+                ignoreDefaultArgs: ['--enable-automation']
             });
             this.info('puppeteer Started.')
             promise.resolve();
@@ -133,30 +139,58 @@ class XFP {
         }
         return promise;
     }
-    async onStartFFMPEG(){
+    async onStartFFMPEG() {
         const promise = usePromise();
-        const args = `-y -f x11grab -draw_mouse 0 -i ${this.display} -f flv pipe:1`
-        this.mainProcess = spawn('ffmpeg',args.split(" ").map(a=>a.trim()))
+        this.info('Sarting ffmpeg.')
+        const args = `-y -f x11grab -draw_mouse 0 -i ${this.display} -s 1280x720 -r 24 -f matroska -c:v libx264 -pix_fmt yuv420p -`;
+        this.mainProcess = spawn('ffmpeg', args.split(" ").map(a => a.trim()))
         let check = false;
-        this.mainProcess.stdout.on('data',data=>{
+        this.mainProcess.stdout.on('data', data => {
             // this.info(data.toString())
-            if(!check){
+            if (!check) {
+                this.info('ffmpeg started.')
                 promise.resolve();
                 check = true;
             }
         })
-        this.mainProcess.stderr.on('data',data=>{
+        this.mainProcess.stderr.on('data', data => {
             // this.error(data.toString())
-            if(!check){
+            if (!check) {
+                this.info('ffmpeg started.')
                 promise.resolve();
                 check = true;
             }
         })
         return promise;
     }
-    setUrl(url) {
-        if (!url) return
+    async onUseUrl(url) {
+        const promise = usePromise();
+        if (!url) {
+            promise.reject();
+            return promise;
+        }
         this.url = url;
+        if (this.started && this.browser) {
+            let page = null;
+            try {
+                const pages = await this.browser.pages();
+                if (pages.length > 0) {
+                    page = pages[0];
+                } else {
+                    page = await browser.newPage();
+                }
+            } catch (err) { }
+            if (page) {
+                await page.setViewport({ width: 1280, height: 720 });
+                await page.goto(this.url);
+                promise.resolve()
+            } else {
+                promise.reject();
+            }
+        } else {
+            promise.resolve();
+        }
+        return promise;
     }
     info() {
         if (!this.debug) return
@@ -166,17 +200,46 @@ class XFP {
         if (!this.debug) return
         console.log('[!]', ...arguments)
     }
-    pipeToFile(){
-
-    }
-    pipeToRtmp(url,key){
-        if(!url || !key || !this.mainProcess) return
-        const args = `-i pipe:0 -f flv ${url.trim('/')}/${key}`
-        let process = spawn('ffmpeg',args.split(' ').map(a=>a.trim()))
-        this.mainProcess.pipe(process);
+    pipeToFile(fileName, options = {}) {
+        if (!fileName || !this.mainProcess) return () => { }
+        const ext = path.extname(fileName).replace(/./, '')
+        const args = `-y -i pipe:0 -c copy -f ${ext} ${fileName}`
+        let process = spawn('ffmpeg', args.split(' ').map(a => a.trim()))
+        this.info(`Started file process pid=${process.pid}`)
+        process.stderr.on('data', data => {
+            if (options && options.debug) this.error(data.toString())
+        })
+        process.stdout.on('data', data => {
+            if (options && options.debug) this.error(data.toString())
+        })
+        this.mainProcess.stdout.pipe(process.stdin);
         this.processes.push(process)
+        return () => {
+            this.info(`Stopped file process pid=${process.pid}`)
+            this.processes = this.processes.filter(p => p.pid !== process.pid);
+            process.kill();
+        }
     }
-    getId(){
+    pipeToRtmp(url, options = {}) {
+        if (!url || !this.mainProcess) return () => { }
+        const args = `-y -i pipe:0 -c copy -f flv ${url}`
+        let process = spawn('ffmpeg', args.split(' ').map(a => a.trim()))
+        this.info(`Started rtmp process pid=${process.pid}`)
+        process.stderr.on('data', data => {
+            if (options && options.debug) this.error(data.toString())
+        })
+        process.stdout.on('data', data => {
+            if (options && options.debug) this.error(data.toString())
+        })
+        this.mainProcess.stdout.pipe(process.stdin);
+        this.processes.push(process)
+        return () => {
+            this.info(`Stopped rtmp process pid=${process.pid}`)
+            this.processes = this.processes.filter(p => p.pid !== process.pid);
+            process.kill();
+        }
+    }
+    getId() {
         return this.display;
     }
 }
