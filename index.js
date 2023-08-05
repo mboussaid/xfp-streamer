@@ -9,14 +9,14 @@ XFP.onReady().then(async () => {
         // console.log(xfp.getId())
         // await xfp.onStartAudioSink();
 
-        const unpipe = xfp.pipeToRtmp('rtmp://localhost/live/STREAM_NAME',{
+        const unpipe = xfp.pipeToRtmp('rtmp://a.rtmp.youtube.com/live2/8uyg-6b3u-ev9z-mrw1-dxj5',{
             debug:true
         });
 
-        // const unpipe2 =  xfp.pipeToFile('file.flv',{
-        //     debug:true
-        // });
-        await xfp.onUseUrl('http://localhost:3000/audio.mp3');
+        const unpipe2 =  xfp.pipeToFile('file.flv',{
+            debug:true
+        });
+        await xfp.onUseUrl('https://www.youtube.com/watch?v=rKnC_POcG6U&ab_channel=JordanPlatten');
     }catch(err){
         console.log(err)
     }
