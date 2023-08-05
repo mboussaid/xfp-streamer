@@ -1,0 +1,27 @@
+{
+  "name": "xfp-streamer",
+  "version": "1.0.0",
+  "description": "xvfb ffmpeg pulseaudio streamer",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "xvfb",
+    "ffmpeg",
+    "pulseaudio",
+    "stream",
+    "streaming",
+    "streamer",
+    "rtmp",
+    "recorder",
+    "recording"
+  ],
+  "author": "Mohamed Boussaid",
+  "license": "ISC",
+  "dependencies": {
+    "node-media-server": "^2.6.2",
+    "puppeteer": "^21.0.1",
+    "xvfb": "^0.4.0"
+  }
+}
