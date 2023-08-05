@@ -4,16 +4,17 @@ XFP.onReady().then(async () => {
     const xfp = new XFP({ debug: 1 });
     // xfp.setUrl('https://wwww.google.com');
     // await xfp.onStartBrowser()
-    await xfp.onStart();
     try{
-        // const unpipe = xfp.pipeToRtmp('rtmp://localhost/live/hello',{
-        //     debug:true
-        // });
+        await xfp.onStart();
+
+        const unpipe = xfp.pipeToRtmp('rtmp://a.rtmp.youtube.com/live2/8uyg-6b3u-ev9z-mrw1-dxj5',{
+            debug:true
+        });
 
         const unpipe2 =  xfp.pipeToFile('file.flv',{
             debug:true
         });
-        await xfp.onUseUrl('https://www.google.com');
+        await xfp.onUseUrl('https://mbasic.facebook.com');
     }catch(err){
         console.log(err)
     }

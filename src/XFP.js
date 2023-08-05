@@ -19,6 +19,8 @@ class XFP {
         this.started = false;
         this.mainProcess = null;
         this.processes = [];
+        this.audioSinkName = null;
+        this.audioSinkId = null;
     }
     static async onReady() {
         const promise = usePromise();
@@ -49,16 +51,25 @@ class XFP {
         try {
             await this.onStartXVFB();
         } catch (err) {
+            this.error(err)
+            success = false;
+        }
+        try {
+            await this.onStartAudioSink();
+        } catch (err) {
+            this.error(err)
             success = false;
         }
         try {
             await this.onStartBrowser();
         } catch (err) {
+            this.error(err)
             success = false;
         }
         try {
             await this.onStartFFMPEG();
         } catch (err) {
+            this.error(err)
             success = false;
         }
         this.started = success;
@@ -68,6 +79,7 @@ class XFP {
     async onStop() {
         const promise = usePromise();
         if (!this.started) {
+            console.trace("???")
             this.error('already stopped')
             promise.resolve();
             return promise;
@@ -87,6 +99,9 @@ class XFP {
         } catch (err) {
             this.error('Error while stopping puppeteer', err)
         }
+        exec(`pactl unload-module ${this.audioSinkId}`,()=>{})
+        this.processes.forEach(process=>process.kill());
+        this.processes = [];
         this.started = false;
         promise.resolve();
         return promise;
@@ -127,7 +142,9 @@ class XFP {
                     '--disable-software-rasterizer',
                     '--disable-dev-shm-usage',
                     '--disable-accelerated-2d-canvas',
-                    `--window-size=1280,720`
+                    `--window-size=1280,720`,
+                    `--audio-output-channels=2`,
+                    `--alsa-output-device=plug:${this.audioSinkName}`
                 ],
                 ignoreDefaultArgs: ['--enable-automation']
             });
@@ -142,7 +159,7 @@ class XFP {
     async onStartFFMPEG() {
         const promise = usePromise();
         this.info('Sarting ffmpeg.')
-        const args = `-y -f x11grab -draw_mouse 0 -i ${this.display} -s 1280x720 -r 24 -f matroska -c:v libx264 -pix_fmt yuv420p -`;
+        const args = `-y -f x11grab -draw_mouse 0 -i ${this.display} -s 1280x720 -r 24 -f matroska -c:a aac -b:a 128k -c:v libx264 -pix_fmt yuv420p -`;
         this.mainProcess = spawn('ffmpeg', args.split(" ").map(a => a.trim()))
         let check = false;
         this.mainProcess.stdout.on('data', data => {
@@ -160,6 +177,20 @@ class XFP {
                 promise.resolve();
                 check = true;
             }
+        })
+        return promise;
+    }
+    async onStartAudioSink() {
+        const promise = usePromise();
+        this.audioSinkName = `virtual_sink_${this.display}`;
+        this.info('Starting audio sink')
+        exec(`pactl load-module module-null-sink sink_name=${this.audioSinkName}`,(err,stdout)=>{
+            if(err) return promise.reject(err);
+            const id = stdout.toString().trim();
+            if(id === "") return promise.reject();
+            this.info('audio sink started')
+            this.audioSinkId = id;
+            promise.resolve(id);
         })
         return promise;
     }
@@ -181,6 +212,7 @@ class XFP {
                 }
             } catch (err) { }
             if (page) {
+                await page.setDefaultNavigationTimeout(0);
                 await page.setViewport({ width: 1280, height: 720 });
                 await page.goto(this.url);
                 promise.resolve()
