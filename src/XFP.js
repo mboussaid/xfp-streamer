@@ -241,7 +241,7 @@ class XFP {
     pipeToFile(fileName, options = {}) {
         if (!fileName || !this.mainProcess) return () => { }
         const ext = path.extname(fileName).replace(/./, '')
-        const args = `-y -i pipe:0 -c:v libx264 -preset medium -crf 18 -c:a aac -b:a 320k -ar 44100 -threads 6 -pix_fmt yuv420p -movflags +faststart -strict -2 -f ${ext} ${fileName}`
+        const args = `-re -i pipe:0 -pix_fmt yuvj420p -x264-params keyint=48:min-keyint=48:scenecut=-1 -b:v 4500k -b:a 128k -ar 44100 -acodec aac -vcodec libx264 -preset medium -crf 28 -threads 4 -f ${ext} ${fileName}`
         let process = spawn('ffmpeg', args.split(' ').map(a => a.trim()))
         this.info(`Started file process pid=${process.pid}`)
         process.stderr.on('data', data => {
@@ -260,7 +260,7 @@ class XFP {
     }
     pipeToRtmp(url, options = {}) {
         if (!url || !this.mainProcess) return () => { }
-        const args = `-y -i pipe:0 -c:v libx264 -preset medium -crf 18 -c:a aac -b:a 320k -ar 44100 -threads 6 -pix_fmt yuv420p -movflags +faststart -strict -2 -f flv ${url}`
+        const args = `-re -i pipe:0 -pix_fmt yuvj420p -x264-params keyint=48:min-keyint=48:scenecut=-1 -b:v 4500k -b:a 128k -ar 44100 -acodec aac -vcodec libx264 -preset medium -crf 28 -threads 4 -f flv ${url}`
         let process = spawn('ffmpeg', args.split(' ').map(a => a.trim()))
         this.info(`Started rtmp process pid=${process.pid}`)
         process.stderr.on('data', data => {
