@@ -21,6 +21,10 @@ class XFP {
         this.processes = [];
         this.audioSinkName = null;
         this.audioSinkId = null;
+        process.on('SIGINT',()=>{
+            this.onStop().then(()=>{},()=>{})
+            process.exit();
+        })
     }
     static async onReady() {
         const promise = usePromise();
@@ -79,7 +83,6 @@ class XFP {
     async onStop() {
         const promise = usePromise();
         if (!this.started) {
-            console.trace("???")
             this.error('already stopped')
             promise.resolve();
             return promise;
@@ -99,7 +102,7 @@ class XFP {
         } catch (err) {
             this.error('Error while stopping puppeteer', err)
         }
-        exec(`pactl unload-module ${this.audioSinkId}`,()=>{})
+        exec(`pactl unload-module ${this.audioSinkName}`,()=>{})
         this.processes.forEach(process=>process.kill());
         this.processes = [];
         this.started = false;
@@ -144,7 +147,7 @@ class XFP {
                     '--disable-accelerated-2d-canvas',
                     `--window-size=1280,720`,
                     `--audio-output-channels=2`,
-                    `--alsa-output-device=plug:${this.audioSinkName}`
+                    `--alsa-output-device=${this.audioSinkName}`
                 ],
                 ignoreDefaultArgs: ['--enable-automation']
             });
@@ -159,11 +162,11 @@ class XFP {
     async onStartFFMPEG() {
         const promise = usePromise();
         this.info('Sarting ffmpeg.')
-        const args = `-y -f x11grab -draw_mouse 0 -i ${this.display} -s 1280x720 -r 24 -f matroska -c:a aac -b:a 128k -c:v libx264 -pix_fmt yuv420p -`;
+        const args = `-y -f x11grab -draw_mouse 0 -i ${this.display} -r 24 -f pulse -i ${this.audioSinkName}.monitor -f matroska -c:a aac -b:a 128k -c:v libx264 -pix_fmt yuv420p -`;
         this.mainProcess = spawn('ffmpeg', args.split(" ").map(a => a.trim()))
         let check = false;
         this.mainProcess.stdout.on('data', data => {
-            // this.info(data.toString())
+            this.info(data.toString())
             if (!check) {
                 this.info('ffmpeg started.')
                 promise.resolve();
@@ -171,7 +174,7 @@ class XFP {
             }
         })
         this.mainProcess.stderr.on('data', data => {
-            // this.error(data.toString())
+            this.error(data.toString())
             if (!check) {
                 this.info('ffmpeg started.')
                 promise.resolve();
@@ -182,13 +185,16 @@ class XFP {
     }
     async onStartAudioSink() {
         const promise = usePromise();
-        this.audioSinkName = `virtual_sink_${this.display}`;
         this.info('Starting audio sink')
+        this.audioSinkId = Date.now();
+        this.audioSinkName = `virtual_sink_${this.audioSinkId}`
+        process.env.PULSE_SINK = this.audioSinkName;
+        process.env.PULSE_SOURCE = this.audioSinkName+'.monitor'
         exec(`pactl load-module module-null-sink sink_name=${this.audioSinkName}`,(err,stdout)=>{
             if(err) return promise.reject(err);
             const id = stdout.toString().trim();
             if(id === "") return promise.reject();
-            this.info('audio sink started')
+            this.info('audio sink started',this.audioSinkName)
             this.audioSinkId = id;
             promise.resolve(id);
         })
@@ -272,7 +278,7 @@ class XFP {
         }
     }
     getId() {
-        return this.display;
+        return this.display ? this.display.match(/\d+/g).join('') : null;
     }
 }
 module.exports = XFP;
