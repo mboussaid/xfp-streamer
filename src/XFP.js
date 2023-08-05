@@ -52,6 +52,11 @@ class XFP {
         }catch(err){
             success = false;
         }
+        try{
+            await this.onStartFFMPEG();
+        }catch(err){
+            success = false;
+        }
         this.started = success;
         this.started ? promise.resolve() : promise.reject();
         return promise;
@@ -130,7 +135,23 @@ class XFP {
     }
     async onStartFFMPEG(){
         const promise = usePromise();
-
+        const args = `-y -f x11grab -draw_mouse 0 -i ${this.display} -f flv pipe:1`
+        this.mainProcess = spawn('ffmpeg',args.split(" ").map(a=>a.trim()))
+        let check = false;
+        this.mainProcess.stdout.on('data',data=>{
+            // this.info(data.toString())
+            if(!check){
+                promise.resolve();
+                check = true;
+            }
+        })
+        this.mainProcess.stderr.on('data',data=>{
+            // this.error(data.toString())
+            if(!check){
+                promise.resolve();
+                check = true;
+            }
+        })
         return promise;
     }
     setUrl(url) {
@@ -148,8 +169,12 @@ class XFP {
     pipeToFile(){
 
     }
-    pipeToRtmp(){
-
+    pipeToRtmp(url,key){
+        if(!url || !key || !this.mainProcess) return
+        const args = `-i pipe:0 -f flv ${url.trim('/')}/${key}`
+        let process = spawn('ffmpeg',args.split(' ').map(a=>a.trim()))
+        this.mainProcess.pipe(process);
+        this.processes.push(process)
     }
     getId(){
         return this.display;
