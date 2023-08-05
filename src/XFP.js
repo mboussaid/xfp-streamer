@@ -140,7 +140,20 @@ class XFP {
                     '--disable-accelerated-2d-canvas',
                     `--window-size=1280,720`,
                     // `--audio-output-channels=2`,
-                    // `--alsa-output-device=${this.audioSinkName}`
+                    // `--alsa-output-device=${this.audioSinkName}`,
+                    '--no-sandbox',                    // Disable sandbox (use only if necessary)
+                    '--disable-gpu',                   // Disable GPU (use only if necessary)
+                    '--disable-software-rasterizer',   // Disable software rasterizer (use only if necessary)
+                    '--disable-dev-shm-usage',         // Reduce /dev/shm usage (Linux only)
+                    '--no-zygote',                     // Disable the zygote process (Linux only)
+                    '--single-process',                // Run in a single process (Windows only)
+                    '--disable-background-networking', // Disable background networking
+                    '--disable-prompt-on-repost',      // Disable prompt on reposting
+                    '--disable-client-side-phishing-detection', // Disable phishing detection
+                    '--disable-setuid-sandbox',        // Disable setuid sandbox (Linux only)
+                    '--disable-web-security',          // Disable web security (use only if necessary)
+                    '--disable-extensions',            // Disable browser extensions
+                    '--disable-features=site-per-process',  // Reduce memory overhead
                 ],
                 ignoreDefaultArgs: ['--enable-automation']
             });
@@ -210,7 +223,7 @@ class XFP {
     pipeToFile(fileName, options = {}) {
         if (!fileName) return () => { }
         const ext = path.extname(fileName).replace(/./, '')
-        const args = `-y -f x11grab -draw_mouse 0 -i ${this.display} -f pulse -i ${this.audioSinkName}.monitor -c:v libx264 -preset ultrafast -tune zerolatency -crf 18 -c:a aac -b:a 320k -ar 44100 -sample_rate 44100 -async 1 -threads 6 -pix_fmt yuv420p -movflags +faststart -strict -2 -f ${ext} ${fileName}`
+        const args = `-y -f x11grab -draw_mouse 0 -i ${this.display} -f pulse -i ${this.audioSinkName}.monitor -c:v libx264 -preset ultrafast -tune zerolatency -crf 18 -c:a aac -b:a 320k -ar 44100 -sample_rate 44100 -async 1 -threads 6 -pix_fmt yuv420p -movflags +faststart -strict -2 -bufsize 10M -vsync 1 -async 1 -r 30 -f ${ext} ${fileName}`
         let process = spawn('ffmpeg', args.split(' ').map(a => a.trim()))
         this.info(`Started file process pid=${process.pid}`)
         process.stderr.on('data', data => {
@@ -228,7 +241,7 @@ class XFP {
     }
     pipeToRtmp(url, options = {}) {
         if (!url) return () => { }
-        const args = `-y -f x11grab -draw_mouse 0 -i ${this.display} -f pulse -i ${this.audioSinkName}.monitor -c:v libx264 -preset ultrafast -tune zerolatency -crf 18 -c:a aac -b:a 320k -ar 44100 -sample_rate 44100 -async 1 -threads 6 -pix_fmt yuv420p -movflags +faststart -strict -2 -f flv ${url}`
+        const args = `-y -f x11grab -draw_mouse 0 -i ${this.display} -f pulse -i ${this.audioSinkName}.monitor -c:v libx264 -preset ultrafast -tune zerolatency -crf 18 -c:a aac -b:a 320k -ar 44100 -sample_rate 44100 -async 1 -threads 6 -pix_fmt yuv420p -movflags +faststart -strict -2 -bufsize 10M -vsync 1 -async 1 -r 30 -f flv ${url}`
         let process = spawn('ffmpeg', args.split(' ').map(a => a.trim()))
         this.info(`Started rtmp process pid=${process.pid}`)
         process.stderr.on('data', data => {
