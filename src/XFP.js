@@ -21,7 +21,7 @@ class XFP {
         this.audioSinkName = null;
         this.audioSinkId = null;
         process.on('SIGINT',()=>{
-            this.onStop().then(()=>{},()=>{})
+            this.onStop().then(console.log,console.log)
             process.exit();
         })
     }
@@ -81,6 +81,16 @@ class XFP {
             return promise;
         }
         try {
+            this.info('Stopping audio sink.')
+            spawn('pactl',[
+                'unload-module',
+                this.audioSinkId
+            ])
+            this.info('audio sink Stopped.')
+        } catch (err) {
+            this.error('Error while stopping audio sink', err)
+        }
+        try {
             this.info('Stopping XVFB.')
             this.xvfb.stopSync();
             this.info('XVFB Stopped.')
@@ -95,7 +105,6 @@ class XFP {
         } catch (err) {
             this.error('Error while stopping puppeteer', err)
         }
-        exec(`pactl unload-module ${this.audioSinkName}`,()=>{})
         this.processes.forEach(process=>process.kill());
         this.processes = [];
         this.started = false;
@@ -139,8 +148,8 @@ class XFP {
                     '--disable-dev-shm-usage',
                     '--disable-accelerated-2d-canvas',
                     `--window-size=1280,720`,
-                    // `--audio-output-channels=2`,
-                    // `--alsa-output-device=${this.audioSinkName}`,
+                    `--audio-output-channels=2`,
+                    `--alsa-output-device=${this.audioSinkName}`,
                     '--no-sandbox',                    // Disable sandbox (use only if necessary)
                     '--disable-gpu',                   // Disable GPU (use only if necessary)
                     '--disable-software-rasterizer',   // Disable software rasterizer (use only if necessary)
@@ -168,16 +177,15 @@ class XFP {
     async onStartAudioSink() {
         const promise = usePromise();
         this.info('Starting audio sink')
-        this.audioSinkId = Date.now();
-        this.audioSinkName = `virtual_sink_${this.audioSinkId}`
+        this.audioSinkName = `virtual_sink_${Date.now()}`
         process.env.PULSE_SINK = this.audioSinkName;
-        process.env.PULSE_SOURCE = this.audioSinkName+'.monitor'
+        // process.env.PULSE_SOURCE = this.audioSinkName+'.monitor'
         exec(`pactl load-module module-null-sink sink_name=${this.audioSinkName}`,(err,stdout)=>{
             if(err) return promise.reject(err);
             const id = stdout.toString().trim();
             if(id === "") return promise.reject();
-            this.info('audio sink started',this.audioSinkName)
             this.audioSinkId = id;
+            this.info('audio sink started',this.audioSinkId)
             promise.resolve(id);
         })
         return promise;
@@ -223,7 +231,7 @@ class XFP {
     pipeToFile(fileName, options = {}) {
         if (!fileName) return () => { }
         const ext = path.extname(fileName).replace(/./, '')
-        const args = `-y -f x11grab -draw_mouse 0 -i ${this.display} -f pulse -i ${this.audioSinkName}.monitor -c:v libx264 -preset ultrafast -tune zerolatency -crf 18 -c:a aac -b:a 320k -ar 44100 -sample_rate 44100 -async 1 -threads 6 -pix_fmt yuv420p -movflags +faststart -strict -2 -bufsize 10M -vsync 1 -async 1 -r 30 -f ${ext} ${fileName}`
+        const args = `-y -f x11grab -draw_mouse 0 -i ${this.display} -f pulse -i ${this.audioSinkName}.monitor -c:v libx264 -preset ultrafast -tune zerolatency -r 30 -crf 18 -c:a aac -b:a 320k -ar 44100 -r 30 -sample_rate 44100 -async 1 -threads 6 -pix_fmt yuv420p -movflags +faststart -strict -2 -bufsize 10M -vsync 1 -async 1 -r 30 -f ${ext} ${fileName}`
         let process = spawn('ffmpeg', args.split(' ').map(a => a.trim()))
         this.info(`Started file process pid=${process.pid}`)
         process.stderr.on('data', data => {
@@ -241,7 +249,7 @@ class XFP {
     }
     pipeToRtmp(url, options = {}) {
         if (!url) return () => { }
-        const args = `-y -f x11grab -draw_mouse 0 -i ${this.display} -f pulse -i ${this.audioSinkName}.monitor -c:v libx264 -preset ultrafast -tune zerolatency -crf 18 -c:a aac -b:a 320k -ar 44100 -sample_rate 44100 -async 1 -threads 6 -pix_fmt yuv420p -movflags +faststart -strict -2 -bufsize 10M -vsync 1 -async 1 -r 30 -f flv ${url}`
+        const args = `-y -f x11grab -draw_mouse 0 -i ${this.display} -f pulse -i ${this.audioSinkName}.monitor -c:v libx264 -r 30 -preset ultrafast -tune zerolatency -crf 18 -c:a aac -b:a 320k -ar 44100 -sample_rate 44100 -async 1 -threads 6 -pix_fmt yuv420p -movflags +faststart -strict -2 -bufsize 10M -vsync 1 -async 1 -r 30 -f flv ${url}`
         let process = spawn('ffmpeg', args.split(' ').map(a => a.trim()))
         this.info(`Started rtmp process pid=${process.pid}`)
         process.stderr.on('data', data => {

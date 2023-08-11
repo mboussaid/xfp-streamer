@@ -10,7 +10,7 @@ XFP.onReady().then(async ()=>{
         debug:1
     })
     // xfp.pipeToRtmp('file.flv','RTMP LINK HERE')
-    await xfp.onUseUrl('https://www.google.com') // navigate to google
+    await xfp.onUseUrl('https://www.youtube.com/watch?v=5K--J8nxPWk&ab_channel=SUITV') // navigate to google
     setTimeout(async ()=>{
         await xfp.onStop();
     },5000) // stop everyting after 5 seconds
