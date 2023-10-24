@@ -176,18 +176,19 @@ class XFP {
     }
     async onStartAudioSink() {
         const promise = usePromise();
-        this.info('Starting audio sink')
-        this.audioSinkName = `virtual_sink_${Date.now()}`
-        process.env.PULSE_SINK = this.audioSinkName;
-        // process.env.PULSE_SOURCE = this.audioSinkName+'.monitor'
-        exec(`pactl load-module module-null-sink sink_name=${this.audioSinkName}`,(err,stdout)=>{
-            if(err) return promise.reject(err);
-            const id = stdout.toString().trim();
-            if(id === "") return promise.reject();
-            this.audioSinkId = id;
-            this.info('audio sink started',this.audioSinkId)
-            promise.resolve(id);
-        })
+        // this.info('Starting audio sink')
+        // this.audioSinkName = `virtual_sink_${Date.now()}`
+        // process.env.PULSE_SINK = this.audioSinkName;
+        // // process.env.PULSE_SOURCE = this.audioSinkName+'.monitor'
+        // exec(`pactl load-module module-null-sink sink_name=${this.audioSinkName}`,(err,stdout)=>{
+        //     if(err) return promise.reject(err);
+        //     const id = stdout.toString().trim();
+        //     if(id === "") return promise.reject();
+        //     this.audioSinkId = id;
+        //     this.info('audio sink started',this.audioSinkId)
+        //     promise.resolve(id);
+        // })
+        promise.resolve();
         return promise;
     }
     async onUseUrl(url) {
